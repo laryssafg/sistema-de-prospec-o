@@ -39,16 +39,32 @@ export default function Search() {
 
   const hasError = results.some(r => r.address.startsWith('ERRO:'));
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!keyword || !location) return;
+    
+    // Extract values directly from form to avoid state synchronization race conditions
+    const formData = new FormData(e.currentTarget);
+    const searchKeyword = (formData.get('keyword') as string || '').trim();
+    const searchLocation = (formData.get('location') as string || '').trim();
+
+    if (!searchKeyword || !searchLocation) {
+      toast.error('Preencha o nicho e a cidade.');
+      return;
+    }
+
+    // Sync state for UI consistency
+    setKeyword(searchKeyword);
+    setLocation(searchLocation);
 
     setIsSearching(true);
     setResults([]);
     setSelectedIds(new Set());
     
     try {
-      const response = await api.post('/api/search', { keyword, location });
+      const response = await api.post('/api/search', { 
+        keyword: searchKeyword, 
+        location: searchLocation 
+      });
       setResults(response.data);
       if (response.data.length === 0) {
         toast('Nenhum resultado encontrado.', { icon: 'ℹ️' });
@@ -88,7 +104,7 @@ export default function Search() {
     try {
       await api.post('/api/leads/batch', leadsToSave.map(l => ({
         name: l.name,
-        category: keyword,
+        category: keyword, // Using state is fine here as it's synced above, but we could also use result data if we had it
         address: l.address,
         phone: l.phone || '',
         website: l.website || '',
@@ -96,7 +112,7 @@ export default function Search() {
         user_ratings_total: l.user_ratings_total || 0,
         maps_url: l.maps_url || '',
         business_status: l.business_status || '',
-        city: location,
+        city: l.city, // CRITICAL: Use the city from the result, not the current input state
         assigned_to: 'Laryssa Ferreira',
         prospect_status: 'Novo'
       })));
@@ -125,9 +141,12 @@ export default function Search() {
               <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-tn-text-muted" size={18} />
               <input 
                 type="text" 
+                name="keyword"
                 value={keyword}
                 onChange={e => setKeyword(e.target.value)}
                 placeholder="Ex: Barbearia, Dentista, Academia..."
+                autoComplete="off"
+                spellCheck={false}
                 className="w-full pl-12 pr-4 py-3.5 bg-[#F1F5F9] border border-transparent focus:border-tn-blue focus:bg-white rounded-xl outline-none transition-all text-[13px]"
               />
             </div>
@@ -138,9 +157,12 @@ export default function Search() {
               <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-tn-text-muted" size={18} />
               <input 
                 type="text" 
+                name="location"
                 value={location}
                 onChange={e => setLocation(e.target.value)}
                 placeholder="Ex: São Paulo, SP"
+                autoComplete="off"
+                spellCheck={false}
                 className="w-full pl-12 pr-4 py-3.5 bg-[#F1F5F9] border border-transparent focus:border-tn-blue focus:bg-white rounded-xl outline-none transition-all text-[13px]"
               />
             </div>
