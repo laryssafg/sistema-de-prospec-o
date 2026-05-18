@@ -281,14 +281,11 @@ app.post('/api/search', requireAuth, async (req, res) => {
   
   console.log(`[Search] Intent: ${keyword} in ${location} | API Key present: ${!!apiKey}`);
 
-  let results: any[] = [];
-
-  // 1. Get Results (Real, Mock or Error Fallback)
+  // Mock handling
   if (!apiKey || apiKey === 'MY_GOOGLE_MAPS_API_KEY' || apiKey === '') {
     console.log('[Search] Using Mock Results');
-    results = Array.from({ length: 12 }).map((_, i) => ({
+    const mockResults = Array.from({ length: 12 }).map((_, i) => ({
       id: `mock-${Date.now()}-${i}`,
-      place_id: `mock-${Date.now()}-${i}`,
       name: `${keyword} ${String.fromCharCode(65 + i)}`,
       address: `Rua Principal, ${100 + i}, ${location}`,
       phone: `(11) 9${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -297,123 +294,99 @@ app.post('/api/search', requireAuth, async (req, res) => {
       user_ratings_total: Math.floor(Math.random() * 1000),
       business_status: 'OPERATIONAL',
       maps_url: 'https://maps.google.com',
-      category: keyword,
       city: location
     }));
-  } else {
-    try {
-      console.log('[Search] Calling Google Places API (New)...');
-      const textSearchUrl = `https://places.googleapis.com/v1/places:searchText`;
-      
-      const fieldMask = [
-        'places.id',
-        'places.displayName',
-        'places.formattedAddress',
-        'places.location',
-        'places.rating',
-        'places.userRatingCount',
-        'places.businessStatus',
-        'places.googleMapsUri',
-        'places.websiteUri',
-        'places.nationalPhoneNumber',
-        'places.internationalPhoneNumber',
-        'places.types'
-      ].join(',');
-
-      const response = await axios.post(textSearchUrl, {
-        textQuery: `${keyword} em ${location}`,
-        languageCode: 'pt-BR',
-        regionCode: 'BR',
-        maxResultCount: 20
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': fieldMask
-        },
-        timeout: 10000 // 10s timeout
-      });
-
-      results = response.data.places?.map((p: any) => ({
-        id: p.id,
-        place_id: p.id,
-        name: p.displayName?.text || 'Sem nome',
-        address: p.formattedAddress || 'Sem endereço',
-        phone: p.nationalPhoneNumber || p.internationalPhoneNumber || '',
-        website: p.websiteUri || '',
-        rating: p.rating || 0,
-        user_ratings_total: p.userRatingCount || 0,
-        business_status: p.businessStatus || 'UNKNOWN',
-        maps_url: p.googleMapsUri || '',
-        category: p.types?.[0] || keyword,
-        city: location
-      })) || [];
-
-      console.log(`[Search] Success. Found ${results.length} results.`);
-    } catch (error: any) {
-      const errorStatus = error.response?.status;
-      const errorBody = error.response?.data?.error || {};
-      const details = errorBody.details || [];
-      const errorInfo = details.find((d: any) => d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo') || {};
-      
-      console.error(`[Search] API ERROR [${errorStatus}]:`, JSON.stringify(errorBody, null, 2));
-      
-      let failureReason = 'Ajuste sua Google API Key para buscar resultados reais';
-      let isApiDisabled = false;
-
-      if (errorStatus === 403 || errorInfo.reason === 'SERVICE_DISABLED' || JSON.stringify(errorBody).includes('places.googleapis.com')) {
-        isApiDisabled = true;
-        failureReason = "ERRO 403: Ative a 'Places API (New)' e o Billing no Google Cloud Console.";
-        if (errorInfo.reason === 'BILLING_DISABLED') {
-          failureReason = "ERRO: O faturamento (Billing) precisa estar ativado no Google Cloud.";
-        }
-      } else if (errorStatus === 401 || errorInfo.reason === 'API_KEY_INVALID') {
-        failureReason = "ERRO 401: Chave API do Google Maps inválida ou restrita.";
-      }
-
-      // Fallback to demo results
-      results = Array.from({ length: 3 }).map((_, i) => ({
-        id: `demo-${i}`,
-        place_id: `demo-${i}`,
-        name: `${keyword} (Modo Demo) ${i + 1}`,
-        address: failureReason,
-        phone: '(00) 0000-0000',
-        website: isApiDisabled ? 'https://console.cloud.google.com/marketplace/product/google/places.googleapis.com' : '',
-        rating: 5,
-        user_ratings_total: 10,
-        business_status: 'OPERATIONAL',
-        maps_url: 'https://console.cloud.google.com/marketplace/product/google/places.googleapis.com',
-        category: keyword,
-        city: location
-      }));
-    }
+    return res.json(mockResults);
   }
 
-  // 2. Save Search History (Unified for all cases)
   try {
+    console.log('[Search] Calling Google Places API...');
+    const textSearchUrl = `https://places.googleapis.com/v1/places:searchText`;
+    const response = await axios.post(textSearchUrl, {
+      textQuery: `${keyword} in ${location}`,
+      languageCode: 'pt-BR',
+      regionCode: 'BR'
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.websiteUri,places.internationalPhoneNumber,places.googleMapsUri,places.businessStatus'
+      },
+      timeout: 10000 // 10s timeout
+    });
+
+    const results = response.data.places?.map((p: any) => ({
+      id: p.id,
+      name: p.displayName?.text || 'Sem nome',
+      address: p.formattedAddress || 'Sem endereço',
+      phone: p.internationalPhoneNumber || '',
+      website: p.websiteUri || '',
+      rating: p.rating || 0,
+      user_ratings_total: p.userRatingCount || 0,
+      business_status: p.businessStatus || 'UNKNOWN',
+      maps_url: p.googleMapsUri || '',
+      city: location
+    })) || [];
+
+    console.log(`[Search] Success. Found ${results.length} results.`);
+
+    // Save Search History (async, non-blocking)
     if (supabase) {
-      await supabase.from('searches').insert({ 
+      supabase.from('searches').insert({ 
         user_id: req.session.userId || 'anonymous', 
         keyword, 
         location,
         results_count: results.length
+      }).then(({ error }: any) => {
+        if (error) console.error('[Search] Failed to save to history:', error.message);
       });
     } else {
-      mockSearches.push({ 
-        id: Date.now().toString(), 
-        user_id: req.session.userId, 
-        keyword, 
-        location, 
-        results_count: results.length, 
-        created_at: new Date().toISOString() 
-      });
+      mockSearches.push({ id: Date.now().toString(), user_id: req.session.userId, keyword, location, results_count: results.length, created_at: new Date().toISOString() });
     }
-  } catch (historyError: any) {
-    console.error('[Search] Failed to save to history:', historyError.message);
-  }
 
-  // 3. Send final response
-  res.json(results);
+    res.json(results);
+  } catch (error: any) {
+    const errorBody = error.response?.data?.error || {};
+    const details = errorBody.details || [];
+    const errorInfo = details.find((d: any) => d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo') || {};
+    
+    // Log the summary clearly
+    console.warn(`[Search] API Error: ${errorBody.status || 'ERROR'} - ${errorBody.message || error.message}`);
+    
+    let failureReason = 'Ajuste sua Google API Key para buscar resultados reais';
+    let isApiDisabled = false;
+
+    if (errorInfo.reason === 'SERVICE_DISABLED' || JSON.stringify(errorBody).includes('places.googleapis.com')) {
+      isApiDisabled = true;
+      failureReason = "ERRO: Ative a 'Places API (New)' no seu Google Cloud Console.";
+      console.warn('--- ACTION REQUIRED: Google Places API (New) is not enabled ---');
+      console.warn('Click here to enable: https://console.cloud.google.com/marketplace/product/google/places.googleapis.com');
+      
+      if (errorInfo.reason === 'BILLING_DISABLED') {
+        failureReason = "ERRO: O faturamento (Billing) precisa estar ativado no Google Cloud.";
+        console.warn('Reason: Billing is not enabled for this project.');
+      }
+    } else if (errorInfo.reason === 'API_KEY_INVALID') {
+      failureReason = "ERRO: Chave API do Google Maps inválida ou com restrições.";
+      console.warn('Reason: The API Key is invalid or has restrictive IP/Referrer rules.');
+    }
+
+    // Fallback to demo results
+    const demoResults = Array.from({ length: 3 }).map((_, i) => ({
+      id: `demo-${i}`,
+      name: `${keyword} (Modo Demo) ${i + 1}`,
+      address: failureReason,
+      phone: '(00) 0000-0000',
+      website: isApiDisabled ? 'https://console.cloud.google.com/marketplace/product/google/places.googleapis.com' : '',
+      rating: 5,
+      user_ratings_total: 10,
+      business_status: 'OPERATIONAL',
+      maps_url: 'https://console.cloud.google.com/marketplace/product/google/places.googleapis.com',
+      city: location
+    }));
+    
+    res.json(demoResults);
+  }
 });
 
 // --- DASHBOARD ---
@@ -560,40 +533,6 @@ app.put('/api/leads/:id', requireAuth, async (req, res) => {
     } else {
       res.status(404).json({ error: 'Lead not found' });
     }
-  }
-});
-
-app.delete('/api/leads/:id', requireAuth, async (req, res) => {
-  const { id } = req.params;
-  console.log(`[Leads] Delete single lead: ${id}`);
-
-  if (supabase) {
-    const { error } = await supabase.from('leads').delete().eq('id', id);
-    if (error) return res.status(500).json({ error: 'Failed to delete lead' });
-    res.json({ success: true });
-  } else {
-    const index = mockLeads.findIndex(l => l.id === id);
-    if (index !== -1) {
-      mockLeads.splice(index, 1);
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: 'Lead not found' });
-    }
-  }
-});
-
-app.post('/api/leads/delete-batch', requireAuth, async (req, res) => {
-  const { ids } = req.body;
-  if (!Array.isArray(ids)) return res.status(400).json({ error: 'IDs array required' });
-  console.log(`[Leads] Delete batch: ${ids.length} leads`);
-
-  if (supabase) {
-    const { error } = await supabase.from('leads').delete().in('id', ids);
-    if (error) return res.status(500).json({ error: 'Failed to delete leads' });
-    res.json({ success: true });
-  } else {
-    mockLeads = mockLeads.filter(l => !ids.includes(l.id));
-    res.json({ success: true });
   }
 });
 

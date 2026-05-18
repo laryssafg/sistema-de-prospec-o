@@ -28,7 +28,7 @@ import { cn, formatDate } from '../lib/utils';
 const statusColors: Record<ProspectStatus, string> = {
   'Novo': 'status-badge new',
   'Em contato': 'status-badge contact',
-  'Respondeu': 'status-badge contact',
+  'Respondeu': 'status-badge contact', // Map similar statuses to same theme colors
   'Sem resposta': 'status-badge contact opacity-70',
   'Negociação': 'status-badge contact font-bold',
   'Cliente': 'status-badge client',
@@ -41,7 +41,6 @@ export default function Leads() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchLeads();
@@ -56,52 +55,6 @@ export default function Leads() {
       toast.error('Erro ao buscar leads');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const deleteLead = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este lead?')) return;
-
-    try {
-      await api.delete(`/api/leads/${id}`);
-      setLeads(leads.filter(l => l.id !== id));
-      if (selectedLead?.id === id) setSelectedLead(null);
-      toast.success('Lead excluido com sucesso');
-    } catch (error) {
-      toast.error('Erro ao excluir lead');
-    }
-  };
-
-  const deleteSelected = async () => {
-    if (selectedIds.size === 0) return;
-    if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} leads?`)) return;
-
-    try {
-      await api.post('/api/leads/delete-batch', { ids: Array.from(selectedIds) });
-      setLeads(leads.filter(l => !selectedIds.has(l.id)));
-      setSelectedIds(new Set());
-      toast.success(`${selectedIds.size} leads excluidos`);
-    } catch (error) {
-      toast.error('Erro ao excluir leads selecionados');
-    }
-  };
-
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const selectAll = () => {
-    if (selectedIds.size === filteredLeads.length && filteredLeads.length > 0) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredLeads.map(l => l.id)));
     }
   };
 
@@ -129,9 +82,9 @@ export default function Leads() {
     try {
       const response = await api.put(`/api/leads/${id}`, { notes });
       setLeads(leads.map(l => l.id === id ? response.data : l));
-      toast.success('Observacoes salvas');
+      toast.success('Observações salvas');
     } catch (error) {
-      toast.error('Erro ao salvar observacoes');
+      toast.error('Erro ao salvar observações');
     }
   };
 
@@ -159,6 +112,7 @@ export default function Leads() {
 
   return (
     <div className="space-y-6">
+      {/* Filters Bar */}
       <div className="flex flex-col lg:flex-row justify-between items-center gap-4 bg-white p-5 rounded-xl border border-tn-border shadow-sm">
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
           <div className="relative w-full sm:w-80">
@@ -184,15 +138,6 @@ export default function Leads() {
           </select>
         </div>
         <div className="flex items-center gap-3 w-full lg:w-auto">
-          {selectedIds.size > 0 && (
-            <button 
-              onClick={deleteSelected}
-              className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors uppercase tracking-widest"
-            >
-              <Trash2 size={16} />
-              Excluir ({selectedIds.size})
-            </button>
-          )}
           <button 
             onClick={exportToExcel}
             className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-tn-border text-tn-text-muted rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors uppercase tracking-widest"
@@ -203,24 +148,17 @@ export default function Leads() {
         </div>
       </div>
 
+      {/* Table Container */}
       <div className="bg-white rounded-xl border border-tn-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#F8FAFC] border-b border-tn-border">
-                <th className="px-6 py-3.5 w-10 text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedIds.size === filteredLeads.length && filteredLeads.length > 0}
-                    onChange={selectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-tn-blue focus:ring-tn-blue"
-                  />
-                </th>
                 <th className="px-6 py-3.5 text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Empresa</th>
                 <th className="px-6 py-3.5 text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Cidade</th>
                 <th className="px-6 py-3.5 text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Telefone</th>
                 <th className="px-6 py-3.5 text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Status</th>
-                <th className="px-6 py-3.5 text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Responsavel</th>
+                <th className="px-6 py-3.5 text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Responsável</th>
                 <th className="px-6 py-3.5"></th>
               </tr>
             </thead>
@@ -228,31 +166,20 @@ export default function Leads() {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={7} className="px-6 py-8"><div className="h-4 bg-gray-100 rounded w-1/2"></div></td>
+                    <td colSpan={6} className="px-6 py-8"><div className="h-4 bg-gray-100 rounded w-1/2"></div></td>
                   </tr>
                 ))
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-20 text-center text-gray-400">Nenhum lead encontrado com os filtros atuais.</td>
+                  <td colSpan={6} className="px-6 py-20 text-center text-gray-400">Nenhum lead encontrado com os filtros atuais.</td>
                 </tr>
               ) : (
                 filteredLeads.map((lead) => (
                   <tr 
                     key={lead.id} 
-                    className={cn(
-                      "hover:bg-tn-bg transition-colors cursor-pointer group",
-                      selectedIds.has(lead.id) && "bg-tn-bg"
-                    )}
+                    className="hover:bg-tn-bg transition-colors cursor-pointer group"
                     onClick={() => setSelectedLead(lead)}
                   >
-                    <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedIds.has(lead.id)}
-                        onChange={e => toggleSelect(lead.id, e as any)}
-                        className="w-4 h-4 rounded border-gray-300 text-tn-blue focus:ring-tn-blue"
-                      />
-                    </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-bold text-tn-text-main text-[13px]">{lead.name}</span>
@@ -293,6 +220,7 @@ export default function Leads() {
         </div>
       </div>
 
+      {/* Details Modal */}
       <AnimatePresence>
         {selectedLead && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -309,6 +237,7 @@ export default function Leads() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[24px] shadow-2xl overflow-hidden relative flex flex-col border border-tn-border"
             >
+              {/* Header */}
               <div className="p-8 border-b border-tn-border flex justify-between items-start">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
@@ -327,11 +256,13 @@ export default function Leads() {
                 </button>
               </div>
 
+              {/* Content */}
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-12 gap-10 bg-white">
+                {/* Left Column: Info */}
                 <div className="md:col-span-7 space-y-8">
                    <div className="grid grid-cols-2 gap-6">
                      <div className="space-y-1">
-                       <label className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Localizacao</label>
+                       <label className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Localização</label>
                        <p className="text-tn-text-main font-bold text-[13px]">{selectedLead.city}</p>
                      </div>
                      <div className="space-y-1">
@@ -341,7 +272,7 @@ export default function Leads() {
                    </div>
 
                    <div className="space-y-4">
-                     <label className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Endereco</label>
+                     <label className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Endereço</label>
                      <div className="bg-[#F8FAFC] p-5 rounded-xl border border-tn-border">
                        <p className="text-[13px] text-tn-text-main leading-relaxed font-medium">{selectedLead.address}</p>
                      </div>
@@ -375,20 +306,21 @@ export default function Leads() {
                    <div className="space-y-4 pt-4 border-t border-tn-border">
                      <label className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest flex items-center gap-2">
                        <MessageSquare size={14} />
-                       Observacoes Comerciais
+                       Observações Comerciais
                      </label>
                      <textarea 
                         defaultValue={selectedLead.notes}
                         onBlur={(e) => updateLeadNotes(selectedLead.id, e.target.value)}
-                        placeholder="Adicione notas sobre negociacoes ou contatos..."
+                        placeholder="Adicione notas sobre negociações ou contatos..."
                         className="w-full h-32 p-4 bg-[#F8FAFC] border border-tn-border focus:border-tn-blue focus:bg-white rounded-xl outline-none transition-all text-[13px] resize-none"
                      />
                    </div>
                 </div>
 
+                {/* Right Column: Actions */}
                 <div className="md:col-span-5 bg-[#F8FAFC] rounded-24 p-8 space-y-8 border-[6px] border-white shadow-inner">
                    <div className="space-y-4">
-                     <h4 className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Estagio do Lead</h4>
+                     <h4 className="text-[11px] font-bold text-tn-text-muted uppercase tracking-widest">Estágio do Lead</h4>
                      <div className="grid grid-cols-1 gap-2">
                        {(['Em contato', 'Negociação', 'Perdido'] as ProspectStatus[]).map(status => (
                          <button 
@@ -407,7 +339,7 @@ export default function Leads() {
                      </div>
                    </div>
 
-                   <div className="pt-6 border-t border-tn-border space-y-3">
+                   <div className="pt-6 border-t border-tn-border">
                      <button 
                         disabled={selectedLead.prospect_status === 'Cliente'}
                         onClick={() => updateLeadStatus(selectedLead.id, 'Cliente')}
@@ -421,15 +353,6 @@ export default function Leads() {
                        {selectedLead.prospect_status === 'Cliente' ? <CheckCircle2 size={18} /> : <ArrowUpRight size={18} />}
                        {selectedLead.prospect_status === 'Cliente' ? 'CLIENTE CONVERTIDO' : 'CONVERTER EM CLIENTE'}
                      </button>
-                     
-                     <button 
-                        onClick={() => deleteLead(selectedLead.id)}
-                        className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 transition-all text-xs uppercase tracking-widest"
-                     >
-                        <Trash2 size={16} />
-                        Excluir Lead
-                     </button>
-
                      {selectedLead.conversion_date && (
                        <p className="text-center text-[10px] font-bold text-emerald-600 mt-4 uppercase tracking-widest bg-emerald-50 py-2 rounded-lg">
                          Convertido em {formatDate(selectedLead.conversion_date)}
