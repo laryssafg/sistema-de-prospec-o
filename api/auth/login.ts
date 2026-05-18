@@ -10,24 +10,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   
   try {
     const { email, password } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPassword = (password || '').trim();
+    
+    // Normalização dos valores recebidos
+    const receivedEmail = (email || '').toString().trim().toLowerCase();
+    const receivedPassword = (password || '').toString().trim();
 
-    console.log(`[${requestId}] Login attempt for: ${cleanEmail}`);
+    // Normalização dos valores do ambiente
+    const envEmail = (process.env.ADMIN_EMAIL || adminEmail).trim().toLowerCase();
+    const envPassword = (process.env.ADMIN_PASSWORD || adminPassword).trim();
 
-    if (cleanEmail === adminEmail && cleanPassword === adminPassword) {
-      console.log(`[${requestId}] Login success`);
-      return res.json({ 
-        id: 'admin-1', 
-        email: adminEmail, 
-        token: 'admin-session-2026' 
+    console.log(`[${requestId}] Debug Info:`);
+    console.log(`[${requestId}] - ADMIN_EMAIL set: ${!!process.env.ADMIN_EMAIL}`);
+    console.log(`[${requestId}] - ADMIN_PASSWORD set: ${!!process.env.ADMIN_PASSWORD}`);
+    console.log(`[${requestId}] - Email recebido: "${receivedEmail}"`);
+    console.log(`[${requestId}] - Matched Email: ${receivedEmail === envEmail}`);
+    console.log(`[${requestId}] - Matched Password: ${receivedPassword === envPassword}`);
+
+    // Verificação de existência das variáveis críticas
+    if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+       console.error(`[${requestId}] Erro: ADMIN_EMAIL ou ADMIN_PASSWORD ausentes no environment.`);
+       return res.status(500).json({ 
+         error: 'Variáveis ADMIN_EMAIL ou ADMIN_PASSWORD ausentes na Vercel',
+         details: {
+           adminEmailSet: !!process.env.ADMIN_EMAIL,
+           adminPasswordSet: !!process.env.ADMIN_PASSWORD
+         }
+       });
+    }
+
+    if (receivedEmail === envEmail && receivedPassword === envPassword) {
+      console.log(`[${requestId}] Login realizado com sucesso para: ${receivedEmail}`);
+      return res.status(200).json({ 
+        success: true,
+        token: 'admin-session-2026', 
+        user: { 
+          id: 'admin-1', 
+          email: envEmail 
+        } 
       });
     }
 
-    console.warn(`[${requestId}] Invalid credentials`);
+    console.warn(`[${requestId}] Falha na autenticação: Credenciais incorretas`);
     return res.status(401).json({ error: 'Credenciais inválidas' });
+
   } catch (error: any) {
-    console.error(`[${requestId}] Login error:`, error.message);
-    res.status(500).json({ error: 'Erro no servidor durante login' });
+    console.error(`[${requestId}] Erro crítico no login:`, error.message);
+    return res.status(500).json({ 
+      error: 'Erro no servidor durante login', 
+      details: error.message 
+    });
   }
 }

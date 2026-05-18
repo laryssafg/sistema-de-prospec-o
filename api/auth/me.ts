@@ -13,23 +13,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const envStatus = checkEnvVars();
-    if (!envStatus.hasAll) {
-      console.warn(`[${requestId}] Missing env vars:`, envStatus.missing.join(', '));
-    }
-
+    const envEmail = (process.env.ADMIN_EMAIL || adminEmail).trim().toLowerCase();
     const sessionId = req.headers['authorization'] || req.headers['x-session-id'] || req.cookies?.['technova.sid'];
-    console.log(`[${requestId}] Session detected: ${!!sessionId}`);
+    
+    console.log(`[${requestId}] Session validation. Path: /api/auth/me`);
+    console.log(`[${requestId}] - Authorization Header: ${!!req.headers['authorization']}`);
+    console.log(`[${requestId}] - Session ID: ${!!sessionId}`);
 
     if (validateToken(sessionId)) {
-      console.log(`[${requestId}] Token valid. User: ${adminEmail}`);
+      console.log(`[${requestId}] Token Válido. Usuário: ${envEmail}`);
       return res.status(200).json({ 
         authenticated: true, 
-        user: { id: 'admin-1', email: adminEmail } 
+        user: { id: 'admin-1', email: envEmail } 
       });
     }
 
-    console.log(`[${requestId}] Authentication failed or missing.`);
+    console.log(`[${requestId}] Falha na validação: Token inválido ou ausente.`);
     return res.status(401).json({ 
       authenticated: false, 
       user: null,

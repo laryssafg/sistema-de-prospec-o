@@ -6,18 +6,26 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 console.log('[Backend] Initializing logic module...');
-const getRawEnv = (key: string, fallback: string = '') => 
-  (process.env[key] || fallback).trim().replace(/^["']|["']$/g, '');
+const getRawEnv = (key: string, fallback: string = '') => {
+  const value = process.env[key];
+  if (value === undefined || value === null || value === '') return fallback.trim();
+  return value.trim().replace(/^["']|["']$/g, '');
+};
 
 export const checkEnvVars = () => {
   const vars = ['ADMIN_EMAIL', 'ADMIN_PASSWORD', 'GOOGLE_MAPS_API_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
-  const missing = vars.filter(v => !process.env[v]);
   return {
-    missing,
-    hasAll: missing.length === 0,
+    missing: vars.filter(v => !process.env[v]),
+    hasAll: vars.every(v => !!process.env[v]),
     details: vars.map(v => ({ name: v, exists: !!process.env[v] }))
   };
 };
+
+export const getAdminEmail = () => getRawEnv('ADMIN_EMAIL', 'laryssa.ferreira@technovasystems.com.br').toLowerCase();
+export const getAdminPassword = () => getRawEnv('ADMIN_PASSWORD', 'technova_admin_2026');
+
+export const adminEmail = getAdminEmail();
+export const adminPassword = getAdminPassword();
 
 let _supabaseInstance: any = null;
 
@@ -36,9 +44,6 @@ export const getSupabase = () => {
   }
   return _supabaseInstance;
 };
-
-export const adminEmail = getRawEnv('ADMIN_EMAIL', 'laryssa.ferreira@technovasystems.com.br').toLowerCase();
-export const adminPassword = getRawEnv('ADMIN_PASSWORD', 'technova_admin_2026');
 
 export interface SearchResult {
   id: string;
