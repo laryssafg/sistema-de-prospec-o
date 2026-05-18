@@ -51,8 +51,15 @@ export default function App() {
   const checkAuth = async () => {
     try {
       const response = await api.get('/api/auth/me');
-      setUser(response.data);
-    } catch (error) {
+      if (response.data && response.data.authenticated && response.data.user) {
+        setUser(response.data.user);
+      } else {
+        setUser(null);
+      }
+    } catch (error: any) {
+      if (error.response?.status !== 401) {
+        console.error('Auth Check error:', error.message);
+      }
       setUser(null);
     } finally {
       setLoading(false);

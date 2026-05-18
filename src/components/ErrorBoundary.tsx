@@ -37,7 +37,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             </p>
             <div className="bg-red-50 p-4 rounded-xl mb-8 text-left border border-red-100 overflow-auto max-h-40">
               <p className="text-[10px] font-mono text-red-800 break-all">
-                {this.state.error?.name}: {this.state.error?.message}
+                {String(this.state.error?.name || 'Error')}: {String(this.state.error?.message || 'Unknown error')}
               </p>
             </div>
             <button 

@@ -1,9 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateToken } from '../src/lib/serverless-auth';
-import { supabase } from '../src/lib/backend-logic';
+import { getSupabase } from '../src/lib/backend-logic';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const token = req.headers['x-session-id'] || req.cookies?.['technova.sid'];
+  const token = req.headers['authorization'] || req.headers['x-session-id'] || req.cookies?.['technova.sid'];
   if (!validateToken(token)) return res.status(401).json({ error: 'Unauthorized' });
 
   const defaultDashboard = {
@@ -15,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     conversionRate: 0
   };
 
+  const supabase = getSupabase();
   if (supabase) {
     try {
       const countSafely = async (table: string, filter?: { col: string, val: string }) => {

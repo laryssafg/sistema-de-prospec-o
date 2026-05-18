@@ -5,12 +5,37 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+console.log('[Backend] Initializing logic module...');
 const getRawEnv = (key: string, fallback: string = '') => 
   (process.env[key] || fallback).trim().replace(/^["']|["']$/g, '');
 
-const supabaseUrl = getRawEnv('SUPABASE_URL');
-const supabaseKey = getRawEnv('SUPABASE_ANON_KEY');
-export const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+export const checkEnvVars = () => {
+  const vars = ['ADMIN_EMAIL', 'ADMIN_PASSWORD', 'GOOGLE_MAPS_API_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+  const missing = vars.filter(v => !process.env[v]);
+  return {
+    missing,
+    hasAll: missing.length === 0,
+    details: vars.map(v => ({ name: v, exists: !!process.env[v] }))
+  };
+};
+
+let _supabaseInstance: any = null;
+
+export const getSupabase = () => {
+  if (_supabaseInstance) return _supabaseInstance;
+  
+  const supabaseUrl = getRawEnv('SUPABASE_URL');
+  const supabaseKey = getRawEnv('SUPABASE_ANON_KEY');
+  
+  try {
+    if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
+      _supabaseInstance = createClient(supabaseUrl, supabaseKey);
+    }
+  } catch (e) {
+    console.error('Failed to initialize Supabase client:', e);
+  }
+  return _supabaseInstance;
+};
 
 export const adminEmail = getRawEnv('ADMIN_EMAIL', 'laryssa.ferreira@technovasystems.com.br').toLowerCase();
 export const adminPassword = getRawEnv('ADMIN_PASSWORD', 'technova_admin_2026');
