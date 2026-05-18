@@ -74,12 +74,12 @@ const checkDatabase = async () => {
           );
         `);
       } else {
-        console.error('Supabase connection error:', msg);
-        if (msg.toLowerCase().includes('fetch failed') || msg.toLowerCase().includes('network error')) {
-          console.warn('--- CRITICAL: Supabase URL is unreachable. ---');
-          console.warn('The application will fallback to MOCK MODE to remain functional.');
-          console.warn('Check if SUPABASE_URL starts with https:// and is not paused.');
-          supabase = null; // FORCE MOCK MODE
+        const msgLow = msg.toLowerCase();
+        if (msgLow.includes('fetch failed') || msgLow.includes('network error') || msgLow.includes('load failed')) {
+          console.warn('--- INFO: Supabase connection unavailable. Entering MOCK MODE. ---');
+          supabase = null; 
+        } else {
+          console.error('Supabase connection error:', msg);
         }
       }
     } else {
@@ -87,10 +87,11 @@ const checkDatabase = async () => {
     }
   } catch (err: any) {
     const msg = err.message || String(err);
-    console.error('Database pre-check failed:', msg);
     if (msg.toLowerCase().includes('fetch failed')) {
-      console.warn('--- CRITICAL: Supabase URL unreachable (Pre-check). Fallback to MOCK MODE. ---');
-      supabase = null; // FORCE MOCK MODE
+      console.warn('--- INFO: Supabase connection unavailable (Pre-check). Entering MOCK MODE. ---');
+      supabase = null;
+    } else {
+      console.error('Database pre-check failed:', msg);
     }
   }
 };
@@ -404,18 +405,28 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
   if (supabase) {
     try {
       // Helper to count safely
-      const countSafely = async (table: string, filter?: { col: string, val: string }) => {
+const countSafely = async (table: string, filter?: { col: string, val: string }) => {
         try {
+          if (!supabase) return 0;
           let query = supabase.from(table).select('*', { count: 'exact', head: true });
           if (filter) query = query.eq(filter.col, filter.val);
           const { count, error } = await query;
           if (error) {
-            console.warn(`[Dashboard] Safe count warned on ${table}:`, error.message);
+            const msg = error.message || String(error);
+            console.warn(`[Dashboard] Safe count warned on ${table}:`, msg);
+            if (msg.toLowerCase().includes('fetch failed')) {
+              console.warn(`[Dashboard] Network failure detected on ${table}. Switching to Mock Mode.`);
+              supabase = null;
+            }
             return 0;
           }
           return count || 0;
         } catch (err: any) {
-          console.error(`[Dashboard] Critical fetch error on ${table}:`, err.message);
+          const msg = err.message || String(err);
+          console.error(`[Dashboard] Critical fetch error on ${table}:`, msg);
+          if (msg.toLowerCase().includes('fetch failed')) {
+            supabase = null;
+          }
           return 0;
         }
       };
@@ -470,14 +481,16 @@ app.get('/api/leads', requireAuth, async (req, res) => {
     try {
       const { data: leads, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[Leads] Database query warning:', error.message);
-        // Supabase error codes for missing table: 42P01 or similar
-        // We return empty array to keep the UI from blowing up
+        const msg = error.message || String(error);
+        if (msg.toLowerCase().includes('fetch failed')) supabase = null;
+        console.warn('[Leads] Database query warning:', msg);
         return res.json([]);
       }
       res.json(leads || []);
     } catch (err: any) {
-      console.error('[Leads] Critical fetch error:', err.message);
+      const msg = err.message || String(err);
+      if (msg.toLowerCase().includes('fetch failed')) supabase = null;
+      console.error('[Leads] Critical fetch error:', msg);
       res.json([]);
     }
   } else {
@@ -489,9 +502,18 @@ app.post('/api/leads', requireAuth, async (req, res) => {
   const leadData = { ...req.body, created_at: new Date().toISOString(), prospect_status: 'Novo' };
   
   if (supabase) {
-    const { data: newLead, error } = await supabase.from('leads').insert(leadData).select().single();
-    if (error) return res.status(500).json({ error: 'Failed to save lead' });
-    res.json(newLead);
+    try {
+      const { data: newLead, error } = await supabase.from('leads').insert(leadData).select().single();
+      if (error) {
+        const msg = error.message || String(error);
+        if (msg.toLowerCase().includes('fetch failed')) supabase = null;
+        return res.status(500).json({ error: 'Failed to save lead' });
+      }
+      res.json(newLead);
+    } catch (err: any) {
+      if (String(err).toLowerCase().includes('fetch failed')) supabase = null;
+      res.status(500).json({ error: 'Database access error' });
+    }
   } else {
     const newLead = { ...leadData, id: Date.now().toString() };
     mockLeads.push(newLead);
@@ -503,9 +525,17 @@ app.post('/api/leads/batch', requireAuth, async (req, res) => {
   const leads = req.body.map((l: any) => ({ ...l, created_at: new Date().toISOString(), prospect_status: 'Novo' }));
   
   if (supabase) {
-    const { data: newLeads, error } = await supabase.from('leads').insert(leads).select();
-    if (error) return res.status(500).json({ error: 'Failed to save leads' });
-    res.json(newLeads);
+    try {
+      const { data: newLeads, error } = await supabase.from('leads').insert(leads).select();
+      if (error) {
+        if (String(error.message).toLowerCase().includes('fetch failed')) supabase = null;
+        return res.status(500).json({ error: 'Failed to save leads' });
+      }
+      res.json(newLeads);
+    } catch (err: any) {
+      if (String(err).toLowerCase().includes('fetch failed')) supabase = null;
+      res.status(500).json({ error: 'Database access error' });
+    }
   } else {
     const newLeads = leads.map((l: any) => ({ ...l, id: Math.random().toString(36).substr(2, 9) }));
     mockLeads = [...mockLeads, ...newLeads];
@@ -522,9 +552,17 @@ app.put('/api/leads/:id', requireAuth, async (req, res) => {
   }
 
   if (supabase) {
-    const { data: lead, error } = await supabase.from('leads').update(updates).eq('id', id).select().single();
-    if (error) return res.status(500).json({ error: 'Failed to update lead' });
-    res.json(lead);
+    try {
+      const { data: lead, error } = await supabase.from('leads').update(updates).eq('id', id).select().single();
+      if (error) {
+        if (String(error.message).toLowerCase().includes('fetch failed')) supabase = null;
+        return res.status(500).json({ error: 'Failed to update lead' });
+      }
+      res.json(lead);
+    } catch (err: any) {
+      if (String(err).toLowerCase().includes('fetch failed')) supabase = null;
+      res.status(500).json({ error: 'Database access error' });
+    }
   } else {
     const index = mockLeads.findIndex(l => l.id === id);
     if (index !== -1) {
@@ -538,9 +576,17 @@ app.put('/api/leads/:id', requireAuth, async (req, res) => {
 
 app.get('/api/search/history', requireAuth, async (req, res) => {
   if (supabase) {
-    const { data: history, error } = await supabase.from('searches').select('*').order('created_at', { ascending: false });
-    if (error) return res.status(500).json({ error: 'Failed to fetch history' });
-    res.json(history);
+    try {
+      const { data: history, error } = await supabase.from('searches').select('*').order('created_at', { ascending: false });
+      if (error) {
+        if (String(error.message).toLowerCase().includes('fetch failed')) supabase = null;
+        return res.status(500).json({ error: 'Failed to fetch history' });
+      }
+      res.json(history);
+    } catch (err: any) {
+      if (String(err).toLowerCase().includes('fetch failed')) supabase = null;
+      res.json([]);
+    }
   } else {
     res.json(mockSearches.sort((a,b) => b.created_at.localeCompare(a.created_at)));
   }

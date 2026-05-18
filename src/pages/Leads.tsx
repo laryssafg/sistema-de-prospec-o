@@ -202,7 +202,7 @@ export default function Leads() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-[11px] text-tn-text-muted font-bold uppercase tracking-wider">
                         <div className="w-6 h-6 rounded-full bg-tn-blue text-white flex items-center justify-center font-bold text-[10px]">
-                          {(lead.assigned_to || 'LT')[0]}
+                          {(lead.assigned_to || 'L')[0]}
                         </div>
                         {(lead.assigned_to || 'Laryssa Ferreira').split(' ')[0]}
                       </div>

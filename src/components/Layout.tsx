@@ -153,11 +153,11 @@ export default function Layout({ children, activePath, onNavigate, onLogout, use
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-[13px] font-bold text-tn-text-main leading-tight">{userEmail.split('@')[0]}</p>
+              <p className="text-[13px] font-bold text-tn-text-main leading-tight">{(userEmail || 'Usuária').split('@')[0]}</p>
               <p className="text-[11px] text-tn-text-muted leading-tight uppercase tracking-wider">Administradora</p>
             </div>
             <div className="w-8 h-8 rounded-full bg-tn-blue flex items-center justify-center text-white text-xs font-bold shadow-sm">
-              {userEmail.charAt(0).toUpperCase()}
+              {(userEmail || 'U').charAt(0).toUpperCase()}
             </div>
           </div>
         </header>
