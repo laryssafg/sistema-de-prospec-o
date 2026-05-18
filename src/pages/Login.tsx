@@ -30,9 +30,10 @@ export default function Login({ onLogin }: LoginProps) {
       toast.success('Bem-vinda, Laryssa!');
     } catch (error: any) {
       if (error.response?.status === 404) {
-        toast.error('API não encontrada (404). Verifique o backend.');
+        toast.error('API não encontrada (404). Verifique o servidor.');
       } else {
-        toast.error(error.response?.data?.error || 'Erro ao realizar login');
+        const errorMsg = error.response?.data?.error;
+        toast.error(typeof errorMsg === 'string' ? errorMsg : 'Erro ao realizar login');
       }
     } finally {
       setIsLoading(false);

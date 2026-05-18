@@ -39,10 +39,8 @@ export default function Dashboard() {
       const response = await api.get('/api/dashboard');
       setStats(response.data);
     } catch (error: any) {
-      console.error('Full Dashboard Error Context:', error.response?.data || error.message);
+      console.error('Dashboard Error:', error.message);
       
-      // If it's a 401, App.tsx interceptor handles it. 
-      // Only toast for other systematic errors
       if (error.response?.status !== 401) {
         toast.error('Não foi possível carregar os dados do painel.');
       }
