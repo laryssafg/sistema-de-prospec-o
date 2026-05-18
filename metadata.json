@@ -2,5 +2,5 @@
   "name": "TechNova Prospect",
   "description": "Sistema de gestão de leads e prospecção comercial via Google Places API para a TechNova Systems.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
