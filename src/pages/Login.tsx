@@ -29,7 +29,11 @@ export default function Login({ onLogin }: LoginProps) {
       onLogin(response.data);
       toast.success('Bem-vinda, Laryssa!');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Erro ao realizar login');
+      if (error.response?.status === 404) {
+        toast.error('API não encontrada (404). Verifique o backend.');
+      } else {
+        toast.error(error.response?.data?.error || 'Erro ao realizar login');
+      }
     } finally {
       setIsLoading(false);
     }
